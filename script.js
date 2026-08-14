@@ -1,16 +1,18 @@
 document.addEventListener('DOMContentLoaded', function () {
 
-  /* ============ PRELOADER ============ */
-  var preloader = document.getElementById('preloader');
-  window.addEventListener('load', function () {
-    setTimeout(function () {
-      if (preloader) preloader.classList.add('hide');
-    }, 350);
-  });
-  // Fallback in case 'load' already fired / is slow
+/* ============ PRELOADER ============ */
+var preloader = document.getElementById('preloader');
+
+window.addEventListener('load', function () {
   setTimeout(function () {
     if (preloader) preloader.classList.add('hide');
-  }, 2500);
+  }, 3000);
+});
+
+/* Fallback */
+setTimeout(function () {
+  if (preloader) preloader.classList.add('hide');
+}, 3000);
 
   /* ============ FOOTER YEAR ============ */
   var yearEl = document.getElementById('year');
