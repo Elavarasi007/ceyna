@@ -154,6 +154,9 @@ document.querySelectorAll('.faq-question').forEach(button => {
 
 
 
+
+
+
 document.addEventListener("DOMContentLoaded", function () {
 
   const grid = document.getElementById("bouquetGrid");
@@ -163,10 +166,21 @@ document.addEventListener("DOMContentLoaded", function () {
 
   if (!grid || !viewport || !prevBtn || !nextBtn) return;
 
-  const cards = Array.from(grid.querySelectorAll(".bouquet-card"));
+  const originalCards = Array.from(
+    grid.querySelectorAll(".bouquet-card")
+  );
+
+  if (!originalCards.length) return;
 
   let currentIndex = 0;
-  let autoSlide;
+  let autoSlide = null;
+  let isAnimating = false;
+  let touchStartX = 0;
+  let touchEndX = 0;
+
+  /* =========================================================
+     VISIBLE CARDS
+     ========================================================= */
 
   function getVisibleCards() {
 
@@ -181,126 +195,398 @@ document.addEventListener("DOMContentLoaded", function () {
     return 6;
   }
 
+
+  /* =========================================================
+     CARD WIDTH + GAP
+     ========================================================= */
+
   function getStep() {
 
-    const card = cards[0];
+    const card = grid.querySelector(".bouquet-card");
 
-    if (!card) return 0;
+    if (!card) {
+      return 0;
+    }
 
     const cardWidth = card.offsetWidth;
-    const gap = parseFloat(getComputedStyle(grid).gap) || 0;
+    const gap = parseFloat(
+      getComputedStyle(grid).gap
+    ) || 0;
 
     return cardWidth + gap;
   }
 
-  function updateCarousel() {
 
+  /* =========================================================
+     CREATE CLONES
+     ========================================================= */
+
+  function createClones() {
+
+    /*
+     * Remove old clones first
+     */
+    grid
+      .querySelectorAll(".carousel-clone")
+      .forEach(function (clone) {
+        clone.remove();
+      });
+
+
+    /*
+     * Number of cards that need to be cloned
+     */
     const visibleCards = getVisibleCards();
-    const maxIndex = Math.max(0, cards.length - visibleCards);
 
-    if (currentIndex > maxIndex) {
-      currentIndex = 0;
-    }
+    const cloneCount = Math.min(
+      visibleCards,
+      originalCards.length
+    );
 
-    if (currentIndex < 0) {
-      currentIndex = maxIndex;
-    }
 
-    grid.style.transform =
-      `translateX(-${currentIndex * getStep()}px)`;
+    /*
+     * Clone first cards and place them
+     * after the original cards
+     */
+    originalCards
+      .slice(0, cloneCount)
+      .forEach(function (card) {
+
+        const clone = card.cloneNode(true);
+
+        clone.classList.add("carousel-clone");
+
+        grid.appendChild(clone);
+
+      });
+
+
+    /*
+     * Reset position
+     */
+    currentIndex = 0;
+
+    grid.style.transition = "none";
+
+    grid.style.transform = "translateX(0)";
+
+
+    /*
+     * Re-enable transition
+     */
+    requestAnimationFrame(function () {
+
+      requestAnimationFrame(function () {
+
+        grid.style.transition = "";
+
+      });
+
+    });
+
   }
+
+
+  /* =========================================================
+     MOVE TO NEXT
+     ========================================================= */
 
   function nextSlide() {
 
-    const visibleCards = getVisibleCards();
-    const maxIndex = Math.max(0, cards.length - visibleCards);
+    if (isAnimating) {
+      return;
+    }
+
+    isAnimating = true;
 
     currentIndex++;
 
-    if (currentIndex > maxIndex) {
+
+    grid.style.transform =
+      "translateX(-" +
+      (currentIndex * getStep()) +
+      "px)";
+
+
+    grid.addEventListener(
+      "transitionend",
+      handleTransitionEnd,
+      {
+        once: true
+      }
+    );
+
+  }
+
+
+  /* =========================================================
+     AFTER SLIDE FINISHES
+     ========================================================= */
+
+  function handleTransitionEnd() {
+
+    /*
+     * When we reach the cloned cards,
+     * silently return to the first real card.
+     */
+    if (currentIndex >= originalCards.length) {
+
       currentIndex = 0;
+
+      grid.style.transition = "none";
+
+      grid.style.transform =
+        "translateX(0)";
+
+
+      requestAnimationFrame(function () {
+
+        requestAnimationFrame(function () {
+
+          grid.style.transition = "";
+
+          isAnimating = false;
+
+        });
+
+      });
+
+    } else {
+
+      isAnimating = false;
+
     }
 
-    updateCarousel();
   }
+
+
+  /* =========================================================
+     PREVIOUS SLIDE
+     ========================================================= */
 
   function previousSlide() {
 
-    const visibleCards = getVisibleCards();
-    const maxIndex = Math.max(0, cards.length - visibleCards);
-
-    currentIndex--;
-
-    if (currentIndex < 0) {
-      currentIndex = maxIndex;
+    if (isAnimating) {
+      return;
     }
 
-    updateCarousel();
+
+    /*
+     * If we are currently at the first card,
+     * jump to the cloned/end position first.
+     */
+    if (currentIndex === 0) {
+
+      currentIndex = originalCards.length;
+
+      grid.style.transition = "none";
+
+      grid.style.transform =
+        "translateX(-" +
+        (currentIndex * getStep()) +
+        "px)";
+
+
+      requestAnimationFrame(function () {
+
+        requestAnimationFrame(function () {
+
+          grid.style.transition = "";
+
+          currentIndex--;
+
+          grid.style.transform =
+            "translateX(-" +
+            (currentIndex * getStep()) +
+            "px)";
+
+        });
+
+      });
+
+      return;
+    }
+
+
+    /*
+     * Normal previous movement
+     */
+    currentIndex--;
+
+    grid.style.transform =
+      "translateX(-" +
+      (currentIndex * getStep()) +
+      "px)";
+
   }
+
+
+  /* =========================================================
+     AUTO SLIDE
+     ========================================================= */
 
   function startAutoSlide() {
 
     clearInterval(autoSlide);
 
     autoSlide = setInterval(function () {
+
       nextSlide();
+
     }, 4000);
 
   }
 
+
   function stopAutoSlide() {
+
     clearInterval(autoSlide);
+
   }
 
+
+  /* =========================================================
+     NEXT BUTTON
+     ========================================================= */
+
   nextBtn.addEventListener("click", function () {
+
     nextSlide();
+
     startAutoSlide();
+
   });
+
+
+  /* =========================================================
+     PREVIOUS BUTTON
+     ========================================================= */
 
   prevBtn.addEventListener("click", function () {
+
     previousSlide();
+
     startAutoSlide();
+
   });
 
-  /* Pause automatic movement while user is viewing the products */
-  viewport.addEventListener("mouseenter", stopAutoSlide);
-  viewport.addEventListener("mouseleave", startAutoSlide);
 
-  /* Mobile touch/swipe support */
+  /* =========================================================
+     DESKTOP HOVER
+     ========================================================= */
 
-  let touchStartX = 0;
-  let touchEndX = 0;
+  viewport.addEventListener(
+    "mouseenter",
+    function () {
 
-  viewport.addEventListener("touchstart", function (e) {
-    touchStartX = e.changedTouches[0].screenX;
-    stopAutoSlide();
-  }, { passive: true });
-
-  viewport.addEventListener("touchend", function (e) {
-
-    touchEndX = e.changedTouches[0].screenX;
-
-    const difference = touchStartX - touchEndX;
-
-    if (Math.abs(difference) > 50) {
-
-      if (difference > 0) {
-        nextSlide();
-      } else {
-        previousSlide();
-      }
+      stopAutoSlide();
 
     }
+  );
 
-    startAutoSlide();
 
-  }, { passive: true });
+  viewport.addEventListener(
+    "mouseleave",
+    function () {
 
-  window.addEventListener("resize", function () {
-    updateCarousel();
-  });
+      startAutoSlide();
 
-  updateCarousel();
+    }
+  );
+
+
+  /* =========================================================
+     MOBILE TOUCH START
+     ========================================================= */
+
+  viewport.addEventListener(
+    "touchstart",
+    function (e) {
+
+      touchStartX =
+        e.changedTouches[0].screenX;
+
+      stopAutoSlide();
+
+    },
+    {
+      passive: true
+    }
+  );
+
+
+  /* =========================================================
+     MOBILE TOUCH END
+     ========================================================= */
+
+  viewport.addEventListener(
+    "touchend",
+    function (e) {
+
+      touchEndX =
+        e.changedTouches[0].screenX;
+
+      const difference =
+        touchStartX - touchEndX;
+
+
+      /*
+       * Swipe left
+       */
+      if (difference > 50) {
+
+        nextSlide();
+
+      }
+
+
+      /*
+       * Swipe right
+       */
+      else if (difference < -50) {
+
+        previousSlide();
+
+      }
+
+
+      startAutoSlide();
+
+    },
+    {
+      passive: true
+    }
+  );
+
+
+  /* =========================================================
+     RESIZE
+     ========================================================= */
+
+  let resizeTimer;
+
+  window.addEventListener(
+    "resize",
+    function () {
+
+      clearTimeout(resizeTimer);
+
+      resizeTimer = setTimeout(function () {
+
+        createClones();
+
+      }, 200);
+
+    }
+  );
+
+
+  /* =========================================================
+     INITIALIZE
+     ========================================================= */
+
+  createClones();
+
   startAutoSlide();
 
 });
